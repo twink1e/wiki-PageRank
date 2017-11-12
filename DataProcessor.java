@@ -84,17 +84,7 @@ class DataProcessor {
     }
   }
 
-  private static void readBinaryBuffered(String file, int num) {
-    try {
-      FileInputStream in = new FileInputStream(file);
-      BufferedInputStream fis = new BufferedInputStream(in);
-      DataInputStream dis = new DataInputStream(fis);
-      for (int i=0; i<num; i++) dis.readInt(); //System.out.println(dis.readInt());
-      dis.close();
-    } catch (Exception e) {
-      System.out.println(e);
-    }
-  }
+  /** For debug */
   private static void readBinaryMapped(String file, int num) {
     try {
       FileChannel in = new FileInputStream(file).getChannel();
