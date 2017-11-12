@@ -1,18 +1,28 @@
 import java.io.*;
+import java.nio.*;
+import java.nio.channels.*;
+import java.util.*;
 
 class DataProcessor {
+  private static final String RAW = "indexbi.bin", LINK = "links.bin", OFFSET = "offset.bin";
+  private static HashMap<Integer, Integer> off2idx;
+  private static long start, end;
+
   private static int getLittleEndian(byte[] b) {
     return ((b[3]&0xff)<<24)+((b[2]&0xff)<<16)+((b[1]&0xff)<<8)+(b[0]&0xff);
   }
 
+  private static void mapOffset2Idx() {
+
+  }
   private static void indexPages() {
-    File in = new File("indexbi.bin");
-    File out = new File("indexed.bin");
     try {
-      FileInputStream fis = new FileInputStream(in);
-      DataInputStream dis = new DataInputStream(fis);
-      FileOutputStream fos = new FileOutputStream(out);
-      DataOutputStream dos = new DataOutputStream(fos);
+      FileInputStream fis = new FileInputStream(RAW);
+      BufferedInputStream bis = new BufferedInputStream(fis);
+      DataInputStream dis = new DataInputStream(bis);
+      FileOutputStream fos = new FileOutputStream(LINK);
+      BufferedOutputStream bos = new BufferedOutputStream(fos);
+      DataOutputStream dos = new DataOutputStream(bos);
       byte[] buffer = new byte[4];
       int num;
       int count = 0;
@@ -21,7 +31,7 @@ class DataProcessor {
         num = getLittleEndian(buffer);
         if (num == 0) {
           num = count++;
-          System.out.println(count);
+          //System.out.println(count);
         }
         dos.writeInt(num);
         //System.out.println(num);
@@ -36,18 +46,6 @@ class DataProcessor {
 
   }
 
-  private static void readBinary(String file, int num) {
-    File in = new File(file);
-    try {
-      FileInputStream fis = new FileInputStream(in);
-      DataInputStream dis = new DataInputStream(fis);
-      for (int i=0; i<num; i++) dis.readInt();//System.out.println(dis.readInt());
-      dis.close();
-    } catch (Exception e) {
-      System.out.println(e);
-    }
-  }
-
   private static void readBinaryBuffered(String file, int num) {
     try {
       FileInputStream in = new FileInputStream(file);
@@ -59,16 +57,30 @@ class DataProcessor {
       System.out.println(e);
     }
   }
+  private static void readBinaryMapped(String file, int num) {
+    try {
+      FileChannel in = new FileInputStream(file).getChannel();;
+      MappedByteBuffer mbb = in.map(FileChannel.MapMode.READ_ONLY, 0, in.size());
+      for (int i=0; i<num; i++) mbb.getInt(4*i); //System.out.println(dis.readInt());
+      in.close();
+    } catch (Exception e) {
+      System.out.println(e);
+    }
+  }
 
   public static void main (String[] args) {
-    //indexPages();
-    long start = System.currentTimeMillis();
-    readBinary("indexbi.bin", 10000);
-    long end = System.currentTimeMillis();
-    System.out.println("took "+ (end-start));
-    start = end;
-    readBinaryBuffered("indexbi.bin", 10000);
+    /*off2idx = new HashMap<Integer, Integer>();
+    start = System.currentTimeMillis();
+    indexPages();
     end = System.currentTimeMillis();
-    System.out.println("buffered took "+ (end-start));
+    System.out.println("took "+ (end-start));*/
+    start = System.currentTimeMillis();
+    readBinaryBuffered(RAW, 1000000);
+    end = System.currentTimeMillis();
+    System.out.println("took "+ (end-start));
+    start = System.currentTimeMillis();
+    readBinaryMapped(RAW, 1000000);
+    end = System.currentTimeMillis();
+    System.out.println("took "+ (end-start));
   }
 }
