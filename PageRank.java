@@ -38,7 +38,7 @@ class PageRank {
           }
         } 
         link = linkIn.map(FileChannel.MapMode.READ_ONLY, linkOffset, linkMem);
-        System.gc();
+        //System.gc();
         linkOffset += linkMem;
       }
   
@@ -74,7 +74,7 @@ class PageRank {
       int srcLoc = srcPage * 8;
       if (srcLoc < srcOffset || srcLoc >= (srcOffset + srcMem)) {
         src = srcIn.map(FileChannel.MapMode.READ_ONLY, srcLoc, srcMem);
-        System.gc();
+        //System.gc();
         srcOffset = srcLoc;
       }
       // SRC score is accessed sequentially
@@ -92,7 +92,7 @@ class PageRank {
       int dstLoc = dstPage * 8;
       if (dstLoc < dstOffset || dstLoc >= (dstOffset + dstMem)) {
         dst = dstIn.map(FileChannel.MapMode.READ_WRITE, dstLoc, dstMem);
-        System.gc();
+        //System.gc();
         dstOffset = dstLoc;
       }
       int pos = dstLoc - dstOffset;
