@@ -101,7 +101,7 @@ class PageRank {
       // SRC score is accessed sequentially
       double ownScore = src.getDouble();
       if (currLink == 0) return 0;
-      else return ownScore/currLink;
+      else return ownScore/currLink*DAMPING;
     } catch (Exception e) {
       e.printStackTrace();
       return 0;
@@ -119,7 +119,7 @@ class PageRank {
       }
       int pos = dstLoc - dstRead + dstMem;
       double oldScore = dst.getDouble(pos);
-      dst.putDouble(pos, oldScore + DAMPING * score);
+      dst.putDouble(pos, oldScore + score);
     } catch (Exception e) {
       e.printStackTrace();
     }
