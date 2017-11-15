@@ -24,7 +24,7 @@ class PageRank {
         while(link.hasRemaining()) {
           if (currPage == -1) {
             currPage = link.getInt();
-            System.out.println(currPage);
+            if (currPage % 100 ==0) System.out.println(currPage);
           } else if (currLink == -1) {
             currLink = link.getInt();
             score = getScore(currPage, currLink);
