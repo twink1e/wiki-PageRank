@@ -3,7 +3,7 @@ import java.nio.*;
 import java.nio.channels.*;
 
 class PageRank {
-  private static final String LINK = "links.bin", SRC = "src.bin", DST = "dst.bin";
+  private static final String LINK = "sorted.bin", SRC = "src.bin", DST = "dst.bin";
   private static final double DAMPING = 0.85;
   private static int numPage;
   private static FileChannel linkIn, srcIn, dstIn;
@@ -13,6 +13,7 @@ class PageRank {
   private static int linkLimit, srcLimit, dstLimit;
   private static int linkMemGiven, srcMemGiven, dstMemGiven;
   private static int numAllo = 0;
+  private static long gcTime = 0;
 
   private static void pageRankIter() {
     try {
@@ -22,12 +23,14 @@ class PageRank {
       int currPage = -1, currLink = -1;
       int linkDst;
       double score = 0;
+      boolean finish = false;
 
-      while(linkRead < linkSize) {
+      while(!finish) {
+        if (linkRead == linkSize) finish = true;
         while(link.hasRemaining()) {
           if (currPage == -1) {
             currPage = link.getInt();
-            if (currPage % 100 ==0) System.out.println(currPage);
+            if (currPage % 100000 ==0) System.out.println(currPage);
           } else if (currLink == -1) {
             currLink = link.getInt();
             score = getScore(currPage, currLink);
@@ -55,8 +58,11 @@ class PageRank {
   }
 
   private static void checkGC(){
-    if (numAllo == 20000) {
+    if (numAllo == 40000) {
+      long gcStart = System.currentTimeMillis();
       System.gc();
+      long gcEnd = System.currentTimeMillis();
+      gcTime += (gcEnd - gcStart);
       numAllo = 0;
     } else {
       numAllo ++;
@@ -193,7 +199,8 @@ class PageRank {
       pageRankIter();
       cleanUp();
       end = System.currentTimeMillis();
-      System.out.println("Iter " + i + " took "+ (end - iterStart) + " ms");
+      System.out.println("GC time " + gcTime);
+      System.out.println("Iter " + i + " took "+ (end - iterStart - gcTime) + " ms");
     }
 
     System.out.println(iter + " iter " + srcMemGiven / 1000000 + " MB src " + linkMemGiven / 1000000 + 
