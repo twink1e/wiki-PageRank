@@ -13,6 +13,7 @@ class PageRank {
 
   private static void pageRankIter() {
     try {
+      fileSetUp();
       int linkSize = (int)linkIn.size();
       link.getInt(); //discard the total page num
       int currPage = -1, currLink = -1;
@@ -23,6 +24,7 @@ class PageRank {
         while(link.hasRemaining()) {
           if (currPage == -1) {
             currPage = link.getInt();
+            System.out.println(currPage);
           } else if (currLink == -1) {
             currLink = link.getInt();
             score = getScore(currPage, currLink);
@@ -32,9 +34,11 @@ class PageRank {
             linkDst = link.getInt();
             addScore(linkDst, score);
             currLink--;
+            //System.out.println("page " + currPage + "link " + currLink);
           }
         } 
         link = linkIn.map(FileChannel.MapMode.READ_ONLY, linkOffset, linkMem);
+        System.gc();
         linkOffset += linkMem;
       }
   
@@ -42,7 +46,7 @@ class PageRank {
       srcIn.close();
       dstIn.close();
     } catch (Exception e) {
-      System.out.println(e);
+      e.printStackTrace();
     }
   }
 
@@ -50,7 +54,8 @@ class PageRank {
     try {
       linkIn = new FileInputStream(LINK).getChannel();
       srcIn = new FileInputStream(SRC).getChannel();
-      dstIn = new FileInputStream(DST).getChannel(); 
+      RandomAccessFile dstFile = new RandomAccessFile(DST, "rw");
+      dstIn = dstFile.getChannel(); 
 
       link = linkIn.map(FileChannel.MapMode.READ_ONLY, 0, linkMem);
       src = srcIn.map(FileChannel.MapMode.READ_ONLY, 0, srcMem);
@@ -60,7 +65,7 @@ class PageRank {
       srcOffset = srcMem;
       dstOffset = dstMem;
     } catch (Exception e) {
-      System.out.println(e);
+      e.printStackTrace();
     }
   }
 
@@ -69,6 +74,7 @@ class PageRank {
       int srcLoc = srcPage * 8;
       if (srcLoc < srcOffset || srcLoc >= (srcOffset + srcMem)) {
         src = srcIn.map(FileChannel.MapMode.READ_ONLY, srcLoc, srcMem);
+        System.gc();
         srcOffset = srcLoc;
       }
       // SRC score is accessed sequentially
@@ -76,7 +82,7 @@ class PageRank {
       if (currLink == 0) return 0;
       else return ownScore/currLink;
     } catch (Exception e) {
-      System.out.println(e);
+      e.printStackTrace();
       return 0;
     }
   }
@@ -86,13 +92,14 @@ class PageRank {
       int dstLoc = dstPage * 8;
       if (dstLoc < dstOffset || dstLoc >= (dstOffset + dstMem)) {
         dst = dstIn.map(FileChannel.MapMode.READ_WRITE, dstLoc, dstMem);
+        System.gc();
         dstOffset = dstLoc;
       }
       int pos = dstLoc - dstOffset;
       double oldScore = dst.getDouble(pos);
       dst.putDouble(pos, oldScore + DAMPING * score);
     } catch (Exception e) {
-      System.out.println(e);
+      e.printStackTrace();
     }
   }
 
@@ -113,7 +120,7 @@ class PageRank {
       for(int i=0; i<numPage; i++) dos.writeDouble(score);
       dos.close();
     } catch (Exception e) {
-      System.out.println(e);
+      e.printStackTrace();
     }
   }
 
@@ -128,7 +135,7 @@ class PageRank {
       for(int i=0; i<numPage; i++) dos.writeDouble(score);
       dos.close();
     } catch (Exception e) {
-      System.out.println(e);
+      e.printStackTrace();
     }
   }
 
@@ -140,7 +147,7 @@ class PageRank {
       src.delete();
       dst.renameTo(src);
     } catch (Exception e) {
-      System.out.println(e);
+      e.printStackTrace();
     }
   }
 
@@ -151,9 +158,9 @@ class PageRank {
     }
 
     int iter = Integer.parseInt(args[0]);
-    int srcMem = Integer.parseInt(args[1]) * 1000000;
-    int linkMem = Integer.parseInt(args[2]) * 1000000;
-    int dstMem = Integer.parseInt(args[3]) * 1000000;
+    srcMem = Integer.parseInt(args[1]) * 1000000;
+    linkMem = Integer.parseInt(args[2]) * 1000000;
+    dstMem = Integer.parseInt(args[3]) * 1000000;
 
     long start, end, iterStart;
     start = System.currentTimeMillis();
