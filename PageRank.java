@@ -3,7 +3,7 @@ import java.nio.*;
 import java.nio.channels.*;
 
 class PageRank {
-  private static final String LINK = "sorted.bin", SRC = "src.bin", DST = "dst.bin";
+  private static final String LINK, SRC = "src.bin", DST = "dst.bin";
   private static final double DAMPING = 0.85;
   private static int numPage;
   private static FileChannel linkIn, srcIn, dstIn;
@@ -25,9 +25,10 @@ class PageRank {
       int linkDst;
       double score = 0;
       boolean finish = false;
+      int file = 0;
 
       while(!finish) {
-        if (linkRead == linkSize) finish = true;
+        if (linkRead == linkSize && (!eff || file == 8)) finish = true;
         while(link.hasRemaining()) {
           if (currPage == -1) {
             currPage = link.getInt();
@@ -41,10 +42,16 @@ class PageRank {
             linkDst = link.getInt();
             addScore(linkDst, score);
             currLink--;
-            //System.out.println("page " + currPage + "link " + currLink);
           }
         }
         linkMem = Math.min(linkMemGiven, linkLimit - linkRead);
+        if (eff && linkMem == 0 && file <8) {
+          file++;
+          linkIn = new FileInputStream(file + ".bin").getChannel();  
+          linkLimit = linkIn.size();
+          linkMem = Math.min(linkMemGiven, linkLimit);  
+          linkRead = 0;      
+        }
         link = linkIn.map(FileChannel.MapMode.READ_ONLY, linkRead, linkMem);
         checkGC();
         linkRead += linkMem;
@@ -188,6 +195,7 @@ class PageRank {
     linkMemGiven = Integer.parseInt(args[2]) * 1000000;
     dstMemGiven = Integer.parseInt(args[3]) * 1000000;
     eff = Integer.parseInt(args[4]) == 1?true:false;
+    LINK = eff?"0.bin":"sorted.bin";
 
     long start, end, iterStart;
     start = System.currentTimeMillis();
