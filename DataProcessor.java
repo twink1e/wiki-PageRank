@@ -4,7 +4,7 @@ import java.nio.channels.*;
 import java.util.*;
 
 class DataProcessor {
-  private static final String RAW = "indexbi.bin", LINK = "links.bin", OFFSET = "offset.bin";
+  private static final String RAW = "indexbi.bin", LINK = "links.bin", OFFSET = "offset.bin", SORT = "sorted.bin";
   private static HashMap<Integer, Integer> off2idx;
   private static long start, end;
   private static int pageNum;
@@ -96,8 +96,47 @@ class DataProcessor {
     }
   }
 
+  private static void sortLinks() {
+    try {
+      FileChannel in = new FileInputStream(LINK).getChannel();
+      MappedByteBuffer mbb = in.map(FileChannel.MapMode.READ_ONLY, 0, in.size());
+
+      FileOutputStream fos = new FileOutputStream(SORT);
+      BufferedOutputStream bos = new BufferedOutputStream(fos);
+      DataOutputStream dos = new DataOutputStream(bos);
+      
+      System.out.println(mbb.limit());
+      int numPage = mbb.getInt();
+      System.out.println(numPage);
+      dos.writeInt(numPage);
+      int numLink, currPage;
+      int[] outLinks;
+      for (int i=0; i<numPage; i++) {
+        currPage = mbb.getInt();
+        if (currPage != i) {
+          System.out.println("i = " + i + " page = " +currPage);
+          in.close();
+          dos.close();
+          System.exit(-1);
+        }
+        dos.writeInt(currPage);
+        numLink = mbb.getInt();
+        dos.writeInt(numLink);
+        outLinks = new int[numLink];
+        System.out.println(currPage);
+        for (int j=0; j<numLink; j++) outLinks[j] = mbb.getInt();
+        Arrays.sort(outLinks);
+        for (int j=0; j<numLink; j++) dos.writeInt(outLinks[j]);
+      }
+      in.close();
+      dos.close();
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
+
   public static void main (String[] args) {
-    off2idx = new HashMap<Integer, Integer>();
+    /*off2idx = new HashMap<Integer, Integer>();
     start = System.currentTimeMillis();
     mapOffset2Idx();
     end = System.currentTimeMillis();
@@ -105,6 +144,10 @@ class DataProcessor {
     start = System.currentTimeMillis();
     indexLinks();
     end = System.currentTimeMillis();
-    System.out.println("Index links took "+ (end-start) + " ms");
+    System.out.println("Index links took "+ (end-start) + " ms");*/
+    start = System.currentTimeMillis();
+    sortLinks();
+    end = System.currentTimeMillis();
+    System.out.println("Sort links took "+ (end-start) + " ms");
   }
 }
