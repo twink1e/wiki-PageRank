@@ -14,6 +14,7 @@ class PageRank {
   private static int linkMemGiven, srcMemGiven, dstMemGiven;
   private static int numAllo = 0;
   private static long gcTime = 0;
+  private static boolean eff;
 
   private static void pageRankIter() {
     try {
@@ -75,6 +76,9 @@ class PageRank {
       srcIn = new FileInputStream(SRC).getChannel();
       RandomAccessFile dstFile = new RandomAccessFile(DST, "rw");
       dstIn = dstFile.getChannel(); 
+
+      srcLimit = dstLimit = (int)srcIn.size();
+      linkLimit = (int)linkIn.size();
 
       srcMem = srcRead = Math.min(srcMemGiven, srcLimit);
       linkMem = linkRead = Math.min(linkMemGiven, linkLimit);
@@ -174,8 +178,8 @@ class PageRank {
   }
 
   public static void main (String[] args) {
-    if (args.length != 4) {
-      System.out.println("Usage: java PageRank {iteration} {src MB} {link MB} {dst MB}");
+    if (args.length != 5) {
+      System.out.println("Usage: java PageRank {iteration} {src MB} {link MB} {dst MB} {1 eff 0 naive}");
       System.exit(-1);
     }
 
@@ -183,27 +187,23 @@ class PageRank {
     srcMemGiven = Integer.parseInt(args[1]) * 1000000;
     linkMemGiven = Integer.parseInt(args[2]) * 1000000;
     dstMemGiven = Integer.parseInt(args[3]) * 1000000;
+    eff = Integer.parseInt(args[4]) == 1?true:false;
 
     long start, end, iterStart;
     start = System.currentTimeMillis();
+
     initSrc();
-    end = System.currentTimeMillis();
-    System.out.println("Init src took "+ (end - start) + " ms");
-
-    srcLimit = dstLimit = (int)new File(SRC).length();
-    linkLimit = (int)new File(LINK).length();
-
     for (int i=0; i<iter; i++) {
       iterStart = System.currentTimeMillis();
       initDst();
       pageRankIter();
       cleanUp();
       end = System.currentTimeMillis();
-      System.out.println("GC time " + gcTime);
-      System.out.println("Iter " + i + " took "+ (end - iterStart - gcTime) + " ms");
+      System.out.println(eff?"Eff":"Naive" + " GC time " + gcTime);
+      System.out.println(eff?"Eff":"Naive" + " iter " + i + " took "+ (end - iterStart - gcTime) + " ms");
     }
-
-    System.out.println(iter + " iter " + srcMemGiven / 1000000 + " MB src " + linkMemGiven / 1000000 + 
+    end = System.currentTimeMillis();
+    System.out.println(eff?"Eff ":"Naive " + iter + " iter " + srcMemGiven / 1000000 + " MB src " + linkMemGiven / 1000000 + 
       " MB link " + dstMemGiven / 1000000 + " MB dst took " + (end - start) + " ms");
   }
 }
