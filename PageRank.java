@@ -9,7 +9,10 @@ class PageRank {
   private static FileChannel linkIn, srcIn, dstIn;
   private static MappedByteBuffer link, src, dst;
   private static int linkMem, srcMem, dstMem;
-  private static int linkOffset, srcOffset, dstOffset;
+  private static int linkRead, srcRead, dstRead;
+  private static int linkLimit, srcLimit, dstLimit;
+  private static int linkMemGiven, srcMemGiven, dstMemGiven;
+  private static int numAllo = 0;
 
   private static void pageRankIter() {
     try {
@@ -20,7 +23,7 @@ class PageRank {
       int linkDst;
       double score = 0;
 
-      while(linkOffset < linkSize) {
+      while(linkRead < linkSize) {
         while(link.hasRemaining()) {
           if (currPage == -1) {
             currPage = link.getInt();
@@ -36,10 +39,11 @@ class PageRank {
             currLink--;
             //System.out.println("page " + currPage + "link " + currLink);
           }
-        } 
-        link = linkIn.map(FileChannel.MapMode.READ_ONLY, linkOffset, linkMem);
-        //System.gc();
-        linkOffset += linkMem;
+        }
+        linkMem = Math.min(linkMemGiven, linkLimit - linkRead);
+        link = linkIn.map(FileChannel.MapMode.READ_ONLY, linkRead, linkMem);
+        checkGC();
+        linkRead += linkMem;
       }
   
       linkIn.close();
@@ -50,6 +54,15 @@ class PageRank {
     }
   }
 
+  private static void checkGC(){
+    if (numAllo == 20000) {
+      System.gc();
+      numAllo = 0;
+    } else {
+      numAllo ++;
+    }
+  }
+
   private static void fileSetUp() {
     try {
       linkIn = new FileInputStream(LINK).getChannel();
@@ -57,13 +70,14 @@ class PageRank {
       RandomAccessFile dstFile = new RandomAccessFile(DST, "rw");
       dstIn = dstFile.getChannel(); 
 
+      srcMem = srcRead = Math.min(srcMemGiven, srcLimit);
+      linkMem = linkRead = Math.min(linkMemGiven, linkLimit);
+      dstMem = dstRead = Math.min(dstMemGiven, dstLimit);
+
       link = linkIn.map(FileChannel.MapMode.READ_ONLY, 0, linkMem);
       src = srcIn.map(FileChannel.MapMode.READ_ONLY, 0, srcMem);
       dst = dstIn.map(FileChannel.MapMode.READ_WRITE, 0, dstMem);
 
-      linkOffset = linkMem;
-      srcOffset = srcMem;
-      dstOffset = dstMem;
     } catch (Exception e) {
       e.printStackTrace();
     }
@@ -72,10 +86,11 @@ class PageRank {
   private static double getScore(int srcPage, int currLink) {
     try {
       int srcLoc = srcPage * 8;
-      if (srcLoc < srcOffset || srcLoc >= (srcOffset + srcMem)) {
+      if (srcLoc < srcRead - srcMem || srcLoc >= srcRead) {
+        srcMem = Math.min(srcMemGiven, srcLimit - srcLoc);
         src = srcIn.map(FileChannel.MapMode.READ_ONLY, srcLoc, srcMem);
-        //System.gc();
-        srcOffset = srcLoc;
+        checkGC();
+        srcRead = srcLoc + srcMem;
       }
       // SRC score is accessed sequentially
       double ownScore = src.getDouble();
@@ -90,12 +105,13 @@ class PageRank {
   private static void addScore(int dstPage, double score) {
     try {
       int dstLoc = dstPage * 8;
-      if (dstLoc < dstOffset || dstLoc >= (dstOffset + dstMem)) {
+      if (dstLoc < dstRead - dstMem || dstLoc >= dstRead) {
+        dstMem = Math.min(dstMemGiven, dstLimit - dstLoc);
         dst = dstIn.map(FileChannel.MapMode.READ_WRITE, dstLoc, dstMem);
-        //System.gc();
-        dstOffset = dstLoc;
+        checkGC();
+        dstRead = dstLoc + dstMem;
       }
-      int pos = dstLoc - dstOffset;
+      int pos = dstLoc - dstRead + dstMem;
       double oldScore = dst.getDouble(pos);
       dst.putDouble(pos, oldScore + DAMPING * score);
     } catch (Exception e) {
@@ -158,15 +174,18 @@ class PageRank {
     }
 
     int iter = Integer.parseInt(args[0]);
-    srcMem = Integer.parseInt(args[1]) * 1000000;
-    linkMem = Integer.parseInt(args[2]) * 1000000;
-    dstMem = Integer.parseInt(args[3]) * 1000000;
+    srcMemGiven = Integer.parseInt(args[1]) * 1000000;
+    linkMemGiven = Integer.parseInt(args[2]) * 1000000;
+    dstMemGiven = Integer.parseInt(args[3]) * 1000000;
 
     long start, end, iterStart;
     start = System.currentTimeMillis();
     initSrc();
     end = System.currentTimeMillis();
     System.out.println("Init src took "+ (end - start) + " ms");
+
+    srcLimit = dstLimit = (int)new File(SRC).length();
+    linkLimit = (int)new File(LINK).length();
 
     for (int i=0; i<iter; i++) {
       iterStart = System.currentTimeMillis();
@@ -177,7 +196,7 @@ class PageRank {
       System.out.println("Iter " + i + " took "+ (end - iterStart) + " ms");
     }
 
-    System.out.println(iter + " iter " + srcMem / 1000000 + " MB src " + linkMem / 1000000 + 
-      " MB link " + dstMem / 1000000 + " MB dst took " + (end - start) + " ms");
+    System.out.println(iter + " iter " + srcMemGiven / 1000000 + " MB src " + linkMemGiven / 1000000 + 
+      " MB link " + dstMemGiven / 1000000 + " MB dst took " + (end - start) + " ms");
   }
 }
