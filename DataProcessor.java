@@ -46,16 +46,52 @@ class DataProcessor {
     }
   }
 
-  private static void indexLinks() {
+  private static void sortLinks() {
     try {
-      FileChannel in = new FileInputStream(RAW).getChannel();
+      FileChannel in = new FileInputStream(LINK).getChannel();
       MappedByteBuffer mbb = in.map(FileChannel.MapMode.READ_ONLY, 0, in.size());
 
-      FileOutputStream fos = new FileOutputStream(LINK);
+      FileOutputStream fos = new FileOutputStream(SORT);
       BufferedOutputStream bos = new BufferedOutputStream(fos);
       DataOutputStream dos = new DataOutputStream(bos);
+      
+      int numPage = mbb.getInt();
+      dos.writeInt(numPage);
+      int numLink, currPage;
+      int[] outLinks;
+      for (int i=0; i<numPage; i++) {
+        currPage = mbb.getInt();
+        if (currPage != i) {
+          System.out.println("Sort link failure i = " + i + " page = " +currPage);
+          in.close();
+          dos.close();
+          System.exit(-1);
+        }
+        dos.writeInt(currPage);
+        numLink = mbb.getInt();
+        dos.writeInt(numLink);
+        outLinks = new int[numLink];
+        for (int j=0; j<numLink; j++) outLinks[j] = mbb.getInt();
+        Arrays.sort(outLinks);
+        for (int j=0; j<numLink; j++) dos.writeInt(outLinks[j]);
+      }
+      in.close();
+      dos.close();
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
 
-      dos.writeInt(pageNum);
+private static void indexLinks() {
+  try {
+    FileChannel in = new FileInputStream(RAW).getChannel();
+    MappedByteBuffer mbb = in.map(FileChannel.MapMode.READ_ONLY, 0, in.size());
+
+    FileOutputStream fos = new FileOutputStream(LINK);
+    BufferedOutputStream bos = new BufferedOutputStream(fos);
+    DataOutputStream dos = new DataOutputStream(bos);
+
+    dos.writeInt(pageNum);
       mbb.position(16); //start of first page
       byte[] buffer = new byte[4];
       int linkNum, offset, idx;
@@ -78,7 +114,7 @@ class DataProcessor {
       if (mbb.position() == in.size()) System.out.println("Index links success!");
       else System.out.println("Index links failed " + mbb.position());
       in.close();
-      fos.close();
+      dos.close();
     } catch (Exception e) {
       System.out.println(e);
     }
@@ -89,54 +125,88 @@ class DataProcessor {
     try {
       FileChannel in = new FileInputStream(file).getChannel();
       MappedByteBuffer mbb = in.map(FileChannel.MapMode.READ_ONLY, 0, in.size());
-      for (int i=0; i<num; i++) mbb.getInt(4*i); //System.out.println(dis.readInt());
+      for (int i=0; i<num; i++) mbb.getInt(4*i);
       in.close();
     } catch (Exception e) {
       System.out.println(e);
     }
   }
 
-  private static void sortLinks() {
+  private static void blkLinks() {
     try {
-      FileChannel in = new FileInputStream(LINK).getChannel();
+      FileChannel in = new FileInputStream(SORT).getChannel();
       MappedByteBuffer mbb = in.map(FileChannel.MapMode.READ_ONLY, 0, in.size());
 
-      FileOutputStream fos = new FileOutputStream(SORT);
-      BufferedOutputStream bos = new BufferedOutputStream(fos);
-      DataOutputStream dos = new DataOutputStream(bos);
+      FileOutputStream[] fos = new FileOutputStream[9];
+      BufferedOutputStream[] bos = new BufferedOutputStream[9];
+      DataOutputStream[] dos = new DataOutputStream[9];
+      ArrayList<Integer>[] outLinks = new ArrayList[9];
+
+      for (int i=0; i<9; i++) {
+        fos[i] = new FileOutputStream(i + ".bin");
+        bos[i] = new BufferedOutputStream(fos[i]);
+        dos[i] = new DataOutputStream(bos[i]);
+      }
       
-      System.out.println(mbb.limit());
       int numPage = mbb.getInt();
-      System.out.println(numPage);
-      dos.writeInt(numPage);
+      for (int i=0; i<9; i++) {
+        dos[i].writeInt(numPage);
+      }
       int numLink, currPage;
-      int[] outLinks;
+
       for (int i=0; i<numPage; i++) {
         currPage = mbb.getInt();
         if (currPage != i) {
-          System.out.println("i = " + i + " page = " +currPage);
-          in.close();
-          dos.close();
-          System.exit(-1);
+          System.out.println("blk link failure i = " + i + " page = " +currPage);
+          closeAndExit(in, dos);
         }
-        dos.writeInt(currPage);
+        for (int j=0; j<9; j++) {
+          dos[j].writeInt(currPage);
+        }
         numLink = mbb.getInt();
-        dos.writeInt(numLink);
-        outLinks = new int[numLink];
-        System.out.println(currPage);
-        for (int j=0; j<numLink; j++) outLinks[j] = mbb.getInt();
-        Arrays.sort(outLinks);
-        for (int j=0; j<numLink; j++) dos.writeInt(outLinks[j]);
+        int dstPage;
+        int fileIdx = 0, accLink = 0;
+        for (int j=0; j<9; j++) outLinks[j] = new ArrayList<Integer>();
+
+          for (int j=0; j<numLink; j++) {
+            dstPage = mbb.getInt();
+            outLinks[dstPage/1000000].add(dstPage);
+          }
+
+          for (int j=0; j<9; j++) {
+            accLink += outLinks[j].size();
+            dos[j].writeInt(outLinks[j].size());
+            for (int l : outLinks[j]) dos[j].writeInt(l);
+          }
+
+        if (accLink != numLink) {
+          System.out.println("blk link failure currPage = " + currPage + " numLink = " + numLink + " accLink " + accLink);
+          closeAndExit(in, dos);
+        }
       }
       in.close();
-      dos.close();
+      for (int i=0; i<9; i++) {
+        dos[i].close();
+      }
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
+
+  private static void closeAndExit(FileChannel in, DataOutputStream[] dos) {
+    try {
+      in.close();
+      for (int i=0; i<9; i++) {
+        dos[i].close();
+      }
+      System.exit(-1);
     } catch (Exception e) {
       e.printStackTrace();
     }
   }
 
   public static void main (String[] args) {
-    /*off2idx = new HashMap<Integer, Integer>();
+    off2idx = new HashMap<Integer, Integer>();
     start = System.currentTimeMillis();
     mapOffset2Idx();
     end = System.currentTimeMillis();
@@ -144,10 +214,11 @@ class DataProcessor {
     start = System.currentTimeMillis();
     indexLinks();
     end = System.currentTimeMillis();
-    System.out.println("Index links took "+ (end-start) + " ms");*/
-    start = System.currentTimeMillis();
+    System.out.println("Index links took "+ (end-start) + " ms");
     sortLinks();
+    start = System.currentTimeMillis();
+    blkLinks();
     end = System.currentTimeMillis();
-    System.out.println("Sort links took "+ (end-start) + " ms");
+    System.out.println("Blk links took "+ (end-start) + " ms");
   }
 }
