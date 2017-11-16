@@ -3,7 +3,8 @@ import java.nio.*;
 import java.nio.channels.*;
 
 class PageRank {
-  private static final String LINK, SRC = "src.bin", DST = "dst.bin";
+  private static final String SRC = "src.bin", DST = "dst.bin";
+  private static String LINK;
   private static final double DAMPING = 0.85;
   private static int numPage;
   private static FileChannel linkIn, srcIn, dstIn;
@@ -19,7 +20,6 @@ class PageRank {
   private static void pageRankIter() {
     try {
       fileSetUp();
-      int linkSize = (int)linkIn.size();
       link.getInt(); //discard the total page num
       int currPage = -1, currLink = -1;
       int linkDst;
@@ -28,11 +28,11 @@ class PageRank {
       int file = 0;
 
       while(!finish) {
-        if (linkRead == linkSize && (!eff || file == 8)) finish = true;
+        if (linkRead == linkLimit && (!eff || file == 8)) finish = true;
         while(link.hasRemaining()) {
           if (currPage == -1) {
             currPage = link.getInt();
-            if (currPage % 100000 ==0) System.out.println(currPage);
+            //if (currPage % 100000 ==0) System.out.println(currPage);
           } else if (currLink == -1) {
             currLink = link.getInt();
             score = getScore(currPage, currLink);
@@ -48,11 +48,14 @@ class PageRank {
         if (eff && linkMem == 0 && file <8) {
           file++;
           linkIn = new FileInputStream(file + ".bin").getChannel();  
-          linkLimit = linkIn.size();
+          linkLimit = (int)linkIn.size();
           linkMem = Math.min(linkMemGiven, linkLimit);  
-          linkRead = 0;      
+          linkRead = 0; 
+          link = linkIn.map(FileChannel.MapMode.READ_ONLY, linkRead, linkMem);
+          link.getInt(); //discard the total page num     
+        } else {
+          link = linkIn.map(FileChannel.MapMode.READ_ONLY, linkRead, linkMem);
         }
-        link = linkIn.map(FileChannel.MapMode.READ_ONLY, linkRead, linkMem);
         checkGC();
         linkRead += linkMem;
       }
@@ -109,11 +112,12 @@ class PageRank {
         checkGC();
         srcRead = srcLoc + srcMem;
       }
-      // SRC score is accessed sequentially
-      double ownScore = src.getDouble();
+      int pos = srcLoc - srcRead + srcMem;
+      double ownScore = src.getDouble(pos);
       if (currLink == 0) return 0;
       else return ownScore/currLink*DAMPING;
     } catch (Exception e) {
+      System.out.println("srcLoc "+srcPage*8+"srcRead "+srcRead +"srcMem "+srcMem);
       e.printStackTrace();
       return 0;
     }
@@ -207,11 +211,11 @@ class PageRank {
       pageRankIter();
       cleanUp();
       end = System.currentTimeMillis();
-      System.out.println(eff?"Eff":"Naive" + " GC time " + gcTime);
-      System.out.println(eff?"Eff":"Naive" + " iter " + i + " took "+ (end - iterStart - gcTime) + " ms");
+      System.out.println((eff?"Eff":"Naive") + " GC time " + gcTime);
+      System.out.println((eff?"Eff":"Naive") + " iter " + i + " took "+ (end - iterStart - gcTime) + " ms");
     }
     end = System.currentTimeMillis();
-    System.out.println(eff?"Eff ":"Naive " + iter + " iter " + srcMemGiven / 1000000 + " MB src " + linkMemGiven / 1000000 + 
+    System.out.println((eff?"Eff ":"Naive ") + iter + " iter " + srcMemGiven / 1000000 + " MB src " + linkMemGiven / 1000000 + 
       " MB link " + dstMemGiven / 1000000 + " MB dst took " + (end - start) + " ms");
   }
 }

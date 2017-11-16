@@ -4,7 +4,8 @@ import java.nio.channels.*;
 import java.util.*;
 
 class DataProcessor {
-  private static final String RAW = "indexbi.bin", LINK = "links.bin", OFFSET = "offset.bin", SORT = "sorted.bin";
+  private static final String RAW = "indexbi.bin", LINK = "links.bin", OFFSET = "offset.bin", 
+    SORT = "sorted.bin", FINAL = "final.bin", RANK_OFFSET = "rank_offset.txt";
   private static HashMap<Integer, Integer> off2idx;
   private static long start, end;
   private static int pageNum;
@@ -168,16 +169,16 @@ private static void indexLinks() {
         int fileIdx = 0, accLink = 0;
         for (int j=0; j<9; j++) outLinks[j] = new ArrayList<Integer>();
 
-          for (int j=0; j<numLink; j++) {
-            dstPage = mbb.getInt();
-            outLinks[dstPage/1000000].add(dstPage);
-          }
+        for (int j=0; j<numLink; j++) {
+          dstPage = mbb.getInt();
+          outLinks[dstPage/1000000].add(dstPage);
+        }
 
-          for (int j=0; j<9; j++) {
-            accLink += outLinks[j].size();
-            dos[j].writeInt(outLinks[j].size());
-            for (int l : outLinks[j]) dos[j].writeInt(l);
-          }
+        for (int j=0; j<9; j++) {
+          accLink += outLinks[j].size();
+          dos[j].writeInt(outLinks[j].size());
+          for (int l : outLinks[j]) dos[j].writeInt(l);
+        }
 
         if (accLink != numLink) {
           System.out.println("blk link failure currPage = " + currPage + " numLink = " + numLink + " accLink " + accLink);
@@ -205,6 +206,56 @@ private static void indexLinks() {
     }
   }
 
+  private static class Pair implements Comparable<Pair> {
+    int p;
+    double s;
+    public Pair(int p, double s) {
+      this.p = p;
+      this.s = s;
+    }
+    @Override
+    public int compareTo(Pair o) {
+      if (s > o.s) return -1;
+      if (s == o.s) return 0;
+      else return 1;
+    }
+  }
+  private static void getTop() {
+    try {
+      FileChannel in = new FileInputStream(FINAL).getChannel();
+      MappedByteBuffer mbb = in.map(FileChannel.MapMode.READ_ONLY, 0, in.size());
+      int numPage = (int)in.size() / 8;
+      Pair[] scores = new Pair[numPage];
+      int maxPage = -1, page = -1;
+      double maxScore = 0, score;
+      for (int i=0; i<numPage; i++) {
+        score = mbb.getDouble();
+        scores[i] = new Pair(i, score);
+        if (score > maxScore) {
+          maxScore = score;
+          maxPage = i;
+        }
+      }
+      in.close();
+      Arrays.sort(scores);
+      if (maxScore != scores[0].s) {
+        System.out.println("max score " + maxScore + "scores " + scores[0].s);
+        System.exit(-1);
+      }
+
+      in = new FileInputStream(OFFSET).getChannel();
+      mbb = in.map(FileChannel.MapMode.READ_ONLY, 0, in.size());
+      FileWriter fw = new FileWriter(RANK_OFFSET);
+
+      for (int i=0; i<1000; i++) 
+        fw.write("SELECT title from pages where offset = " + mbb.getInt(scores[i].p * 4) + ";\n");
+      in.close();
+      fw.close();
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
+
   public static void main (String[] args) {
     off2idx = new HashMap<Integer, Integer>();
     start = System.currentTimeMillis();
@@ -220,5 +271,7 @@ private static void indexLinks() {
     blkLinks();
     end = System.currentTimeMillis();
     System.out.println("Blk links took "+ (end-start) + " ms");
+
+    //getTop();
   }
 }
