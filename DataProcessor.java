@@ -257,7 +257,7 @@ private static void indexLinks() {
   }
 
   public static void main (String[] args) {
-    off2idx = new HashMap<Integer, Integer>();
+    /*off2idx = new HashMap<Integer, Integer>();
     start = System.currentTimeMillis();
     mapOffset2Idx();
     end = System.currentTimeMillis();
@@ -266,7 +266,7 @@ private static void indexLinks() {
     indexLinks();
     end = System.currentTimeMillis();
     System.out.println("Index links took "+ (end-start) + " ms");
-    sortLinks();
+    sortLinks();*/
     start = System.currentTimeMillis();
     blkLinks();
     end = System.currentTimeMillis();
